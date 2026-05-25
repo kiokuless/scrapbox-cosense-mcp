@@ -6,6 +6,7 @@ import { handleSearchPages } from './handlers/search-pages.js';
 import { handleCreatePage } from './handlers/create-page.js';
 import { handleGetPageUrl } from './handlers/get-page-url.js';
 import { handleInsertLines } from './handlers/insert-lines.js';
+import { handleDeleteLines } from './handlers/delete-lines.js';
 import { handleGetSmartContext } from './handlers/get-smart-context.js';
 
 // ツール名正規化ヘルパー
@@ -93,6 +94,20 @@ export function setupRoutes(
             text: String(request.params.arguments?.text),
             projectName: request.params.arguments?.projectName as string | undefined,
             format: (request.params.arguments?.format as "markdown" | "scrapbox" | undefined) ?? undefined
+          }
+        );
+
+      case "delete_lines":
+        return handleDeleteLines(
+          projectName,
+          cosenseSid,
+          {
+            pageTitle: String(request.params.arguments?.pageTitle),
+            targetLineText: String(request.params.arguments?.targetLineText),
+            deleteCount: request.params.arguments?.deleteCount != null
+              ? Number(request.params.arguments.deleteCount)
+              : undefined,
+            projectName: request.params.arguments?.projectName as string | undefined
           }
         );
 

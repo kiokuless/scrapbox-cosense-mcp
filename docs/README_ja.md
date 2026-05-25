@@ -14,6 +14,7 @@
 | `create_page` | WebSocket APIでページを作成（Markdown/Scrapbox本文対応） | 必要 |
 | `get_page_url` | ページの直接URLを生成 | 不要 |
 | `insert_lines` | ページの指定行の後にテキストを挿入 | 必要 |
+| `delete_lines` | ページから1行以上を削除 | 必要 |
 
 `create_page` と `insert_lines` は `format` パラメータ（`"markdown"` または `"scrapbox"`）でコンテンツ変換を制御できます。
 

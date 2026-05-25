@@ -16,6 +16,7 @@ Cosense ページの取得・検索・作成・編集。CLI 経由で実行。
 - `scrapbox-cosense-mcp list [--sort=X --limit=N]` — ページ一覧
 - `scrapbox-cosense-mcp create <title> [--body=TEXT]` — ページ作成（markdown自動変換）
 - `scrapbox-cosense-mcp insert <title> --after=TEXT --text=TEXT` — 行挿入
+- `scrapbox-cosense-mcp delete <title> --line=TEXT [--count=N]` — 行削除
 - `scrapbox-cosense-mcp url <title>` — URL生成
 - `scrapbox-cosense-mcp context <title> [--hop=1|2]` — 関連ページ一括取得（Smart Context）
 

@@ -13,6 +13,7 @@ import * as searchPagesHandler from '@/routes/handlers/search-pages.js';
 import * as createPageHandler from '@/routes/handlers/create-page.js';
 import * as getPageUrlHandler from '@/routes/handlers/get-page-url.js';
 import * as insertLinesHandler from '@/routes/handlers/insert-lines.js';
+import * as deleteLinesHandler from '@/routes/handlers/delete-lines.js';
 
 jest.mock('@/routes/handlers/get-page.js');
 jest.mock('@/routes/handlers/list-pages.js');
@@ -20,6 +21,7 @@ jest.mock('@/routes/handlers/search-pages.js');
 jest.mock('@/routes/handlers/create-page.js');
 jest.mock('@/routes/handlers/get-page-url.js');
 jest.mock('@/routes/handlers/insert-lines.js');
+jest.mock('@/routes/handlers/delete-lines.js');
 
 const mockedGetPage = getPageHandler as jest.Mocked<typeof getPageHandler>;
 const mockedListPages = listPagesHandler as jest.Mocked<typeof listPagesHandler>;
@@ -27,6 +29,7 @@ const mockedSearchPages = searchPagesHandler as jest.Mocked<typeof searchPagesHa
 const mockedCreatePage = createPageHandler as jest.Mocked<typeof createPageHandler>;
 const mockedGetPageUrl = getPageUrlHandler as jest.Mocked<typeof getPageUrlHandler>;
 const mockedInsertLines = insertLinesHandler as jest.Mocked<typeof insertLinesHandler>;
+const mockedDeleteLines = deleteLinesHandler as jest.Mocked<typeof deleteLinesHandler>;
 
 // Mock process.exit to prevent test process from exiting
 const mockExit = jest.spyOn(process, 'exit').mockImplementation((() => {
@@ -314,6 +317,60 @@ describe('CLI', () => {
         // process.exit
       }
       expect(stderrOutput).toContain('--text=TEXT or --text-file=PATH is required');
+    });
+  });
+
+  describe('delete command', () => {
+    it('should call handleDeleteLines with all params', async () => {
+      mockedDeleteLines.handleDeleteLines.mockResolvedValue(successResult);
+      try {
+        await runCli(['delete', 'My Page', '--line=target line', '--count=2']);
+      } catch {
+        // process.exit
+      }
+      expect(mockedDeleteLines.handleDeleteLines).toHaveBeenCalledWith(
+        'test-project',
+        'test-sid',
+        {
+          pageTitle: 'My Page',
+          targetLineText: 'target line',
+          deleteCount: 2,
+          projectName: undefined,
+          compact: false,
+        }
+      );
+    });
+
+    it('should default deleteCount when --count is omitted', async () => {
+      mockedDeleteLines.handleDeleteLines.mockResolvedValue(successResult);
+      try {
+        await runCli(['delete', 'My Page', '--line=target line']);
+      } catch {
+        // process.exit
+      }
+      expect(mockedDeleteLines.handleDeleteLines).toHaveBeenCalledWith(
+        'test-project',
+        'test-sid',
+        expect.objectContaining({ deleteCount: undefined })
+      );
+    });
+
+    it('should error when --line is missing', async () => {
+      try {
+        await runCli(['delete', 'My Page']);
+      } catch {
+        // process.exit
+      }
+      expect(stderrOutput).toContain('--line=TEXT is required');
+    });
+
+    it('should error when --count is invalid', async () => {
+      try {
+        await runCli(['delete', 'My Page', '--line=target line', '--count=0']);
+      } catch {
+        // process.exit
+      }
+      expect(stderrOutput).toContain('--count must be a positive integer');
     });
   });
 

@@ -331,6 +331,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["pageTitle", "targetLineText", "text"],
         },
       },
+      {
+        name: getToolName("delete_lines"),
+        description: `Delete one or more lines from a Scrapbox page on ${SERVICE_LABEL}. Deletes from the first line that exactly matches targetLineText. The page title line cannot be deleted. Uses ${projectName} project as default if projectName is not specified.`,
+        inputSchema: {
+          type: "object",
+          properties: {
+            pageTitle: {
+              type: "string",
+              description: "Title of the page to modify",
+            },
+            targetLineText: {
+              type: "string",
+              description: "Exact text content of the first line to delete. Partial matches are not used.",
+            },
+            deleteCount: {
+              type: "number",
+              minimum: 1,
+              description: "Number of lines to delete starting from the target line. Defaults to 1.",
+            },
+            projectName: {
+              type: "string",
+              description: `Target project name. If not specified, defaults to '${projectName}'.`,
+            },
+          },
+          required: ["pageTitle", "targetLineText"],
+        },
+      },
     ];
   
   
