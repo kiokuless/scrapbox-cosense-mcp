@@ -70,6 +70,37 @@ describe('cosense API functions', () => {
       );
     });
 
+    test('collaboratorsが欠落していても空配列に正規化されること', async () => {
+      const responseWithoutCollaborators: Record<string, unknown> = { ...mockPageResponse };
+      delete responseWithoutCollaborators.collaborators;
+      mockedFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(responseWithoutCollaborators),
+      } as Response);
+
+      const result = await getPage(mockProjectName, 'Test Page', mockSid);
+
+      expect(result?.collaborators).toEqual([]);
+      expect(result?.lines).toEqual(mockPageResponse.lines);
+    });
+
+    test('ユーザーメタデータが欠落していても本文行を保持すること', async () => {
+      const responseWithoutUsers: Record<string, unknown> = { ...mockPageResponse };
+      delete responseWithoutUsers.user;
+      delete responseWithoutUsers.lastUpdateUser;
+      mockedFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(responseWithoutUsers),
+      } as Response);
+
+      const result = await getPage(mockProjectName, 'Test Page', mockSid);
+
+      expect(result?.user).toBeUndefined();
+      expect(result?.lastUpdateUser).toBeUndefined();
+      expect(result?.collaborators).toEqual([]);
+      expect(result?.lines).toEqual(mockPageResponse.lines);
+    });
+
     test('APIエラーの場合にnullを返すこと', async () => {
       mockedFetch.mockResolvedValue({
         ok: false,
@@ -338,6 +369,34 @@ describe('cosense API functions', () => {
       const result = toReadablePage(responseWithoutLastUpdate);
 
       expect(result.lastUpdateUser).toBeUndefined();
+    });
+
+    test('collaboratorsがundefinedの場合は空配列として処理されること', () => {
+      const responseWithoutCollaborators = {
+        ...mockGetPageResponse,
+        collaborators: undefined,
+      };
+
+      const result = toReadablePage(responseWithoutCollaborators);
+
+      expect(result.collaborators).toEqual([]);
+      expect(result.lines).toEqual(mockGetPageResponse.lines);
+    });
+
+    test('userとlastUpdateUserがundefinedの場合も本文行を保持すること', () => {
+      const responseWithoutUsers = {
+        ...mockGetPageResponse,
+        user: undefined,
+        lastUpdateUser: undefined,
+        collaborators: undefined,
+      };
+
+      const result = toReadablePage(responseWithoutUsers);
+
+      expect(result.user).toBeUndefined();
+      expect(result.lastUpdateUser).toBeUndefined();
+      expect(result.collaborators).toEqual([]);
+      expect(result.lines).toEqual(mockGetPageResponse.lines);
     });
   });
 });

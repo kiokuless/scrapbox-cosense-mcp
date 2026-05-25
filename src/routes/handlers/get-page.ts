@@ -7,6 +7,31 @@ export interface GetPageParams {
   compact?: boolean | undefined;
 }
 
+type ReadablePage = ReturnType<typeof toReadablePage>;
+type ReadableUser = ReadablePage["user"];
+
+function getUserDisplayName(user: ReadableUser): string | undefined {
+  return user?.displayName || user?.name || user?.id;
+}
+
+function formatOtherEditors(
+  collaborators: ReadablePage["collaborators"] | undefined,
+  user: ReadableUser,
+  lastUpdateUser: ReadableUser
+): string {
+  const userId = user?.id;
+  const lastUpdateUserId = lastUpdateUser?.id;
+  const names = (Array.isArray(collaborators) ? collaborators : [])
+    .filter(collab =>
+      (!userId || collab.id !== userId) &&
+      (!lastUpdateUserId || collab.id !== lastUpdateUserId)
+    )
+    .map(getUserDisplayName)
+    .filter((name): name is string => Boolean(name));
+
+  return names.length > 0 ? names.join(', ') : '(None)';
+}
+
 export async function handleGetPage(
   defaultProjectName: string,
   cosenseSid: string | undefined,
@@ -25,7 +50,7 @@ export async function handleGetPage(
       }, params.compact);
     }
 
-        const readablePage = toReadablePage(page);
+    const readablePage = toReadablePage(page);
 
     // ページが未保存（persistent=false）かつタイトル行のみの場合は未作成として扱う
     const hasContent = readablePage.lines.length > 1
@@ -49,19 +74,26 @@ export async function handleGetPage(
         : '';
       fullText = `${header}\n${contentText}${links}`;
     } else {
+      const createdUserName =
+        getUserDisplayName(readablePage.lastUpdateUser) ||
+        getUserDisplayName(readablePage.user) ||
+        'Not available';
+      const lastEditorName =
+        getUserDisplayName(readablePage.user) ||
+        getUserDisplayName(readablePage.lastUpdateUser) ||
+        'Not available';
+
       const formattedText = [
         `Title: ${readablePage.title}`,
         `Created: ${formatYmd(new Date(readablePage.created * 1000))}`,
         `Updated: ${formatYmd(new Date(readablePage.updated * 1000))}`,
-        `Created user: ${readablePage.lastUpdateUser?.displayName || readablePage.user.displayName}`,
-        `Last editor: ${readablePage.user.displayName}`,
-        `Other editors: ${(readablePage.collaborators ?? [])
-          .filter(collab =>
-            collab.id !== readablePage.user.id &&
-            collab.id !== readablePage.lastUpdateUser?.id
-          )
-          .map(user => user.displayName)
-          .join(', ')}`
+        `Created user: ${createdUserName}`,
+        `Last editor: ${lastEditorName}`,
+        `Other editors: ${formatOtherEditors(
+          readablePage.collaborators,
+          readablePage.user,
+          readablePage.lastUpdateUser
+        )}`
       ].join('\n');
 
       const linksText = `\nLinks:\n${readablePage.links.length > 0

@@ -36,6 +36,31 @@ function getToolName(baseName: string): string {
   return TOOL_SUFFIX ? `${baseName}_${TOOL_SUFFIX}` : baseName;
 }
 
+type ReadablePage = ReturnType<typeof toReadablePage>;
+type ReadableUser = ReadablePage["user"];
+
+function getUserDisplayName(user: ReadableUser): string | undefined {
+  return user?.displayName || user?.name || user?.id;
+}
+
+function formatOtherEditors(
+  collaborators: ReadablePage["collaborators"] | undefined,
+  user: ReadableUser,
+  lastUpdateUser: ReadableUser
+): string {
+  const userId = user?.id;
+  const lastUpdateUserId = lastUpdateUser?.id;
+  const names = (Array.isArray(collaborators) ? collaborators : [])
+    .filter(collab =>
+      (!userId || collab.id !== userId) &&
+      (!lastUpdateUserId || collab.id !== lastUpdateUserId)
+    )
+    .map(getUserDisplayName)
+    .filter((name): name is string => Boolean(name));
+
+  return names.length > 0 ? names.join(', ') : '(None)';
+}
+
 // resourcesの初期取得用の設定
 const cosenseSid: string | undefined = process.env.COSENSE_SID;
 const projectName: string | undefined = process.env.COSENSE_PROJECT_NAME;
@@ -124,24 +149,31 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     throw new Error(`Page ${title} not found`);
   }
   const readablePage = toReadablePage(getPageResult);
+  const createdUserName =
+    getUserDisplayName(readablePage.lastUpdateUser) ||
+    getUserDisplayName(readablePage.user) ||
+    'Not available';
+  const lastEditorName =
+    getUserDisplayName(readablePage.user) ||
+    getUserDisplayName(readablePage.lastUpdateUser) ||
+    'Not available';
+
   const formattedText = [
     `Title: ${readablePage.title}`,
     `Created: ${formatYmd(new Date(readablePage.created * 1000))}`,
     `Updated: ${formatYmd(new Date(readablePage.updated * 1000))}`,
-    `Created user: ${readablePage.lastUpdateUser?.displayName || readablePage.user.displayName}`,
-    `Last editor: ${readablePage.user.displayName}`,
-    `Other editors: ${readablePage.collaborators
-      .filter(collab => 
-        collab.id !== readablePage.user.id && 
-        collab.id !== readablePage.lastUpdateUser?.id
-      )
-      .map(user => user.displayName)
-      .join(', ')}`,
+    `Created user: ${createdUserName}`,
+    `Last editor: ${lastEditorName}`,
+    `Other editors: ${formatOtherEditors(
+      readablePage.collaborators,
+      readablePage.user,
+      readablePage.lastUpdateUser
+    )}`,
     '',
     readablePage.lines.map(line => line.text).join('\n'),
     '',
-    `Links:\n${getPageResult.links.length > 0 
-      ? getPageResult.links.map((link: string) => `- ${link}`).join('\n') 
+    `Links:\n${readablePage.links.length > 0
+      ? readablePage.links.map((link: string) => `- ${link}`).join('\n')
       : '(None)'}`
   ].join('\n');
 

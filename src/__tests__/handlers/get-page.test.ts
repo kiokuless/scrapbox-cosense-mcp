@@ -112,6 +112,31 @@ describe('handleGetPage', () => {
       expect(mockedCosense.getPage).toHaveBeenCalledWith(mockProjectName, 'Test Page', mockCosenseSid);
       expect(result.content[0]?.text).toContain('Title: Test Page');
     });
+
+    test('ユーザーメタデータが欠落していても本文を返すこと', async () => {
+      mockedCosense.getPage.mockResolvedValue(mockPageResponse);
+      mockedCosense.toReadablePage.mockReturnValue({
+        title: 'Test Page',
+        lines: mockPageResponse.lines,
+        created: mockPageResponse.created,
+        updated: mockPageResponse.updated,
+        user: undefined,
+        lastUpdateUser: undefined,
+        collaborators: undefined,
+        links: mockPageResponse.links,
+      } as unknown as ReturnType<typeof cosense.toReadablePage>);
+
+      const params = { pageTitle: 'Test Page' };
+      const result = await handleGetPage(mockProjectName, mockCosenseSid, params);
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0]?.text).toContain('Title: Test Page');
+      expect(result.content[0]?.text).toContain('Created user: Not available');
+      expect(result.content[0]?.text).toContain('Last editor: Not available');
+      expect(result.content[0]?.text).toContain('Other editors: (None)');
+      expect(result.content[0]?.text).toContain('Line 1');
+      expect(result.content[0]?.text).toContain('Line 2');
+    });
   });
 
   describe('collaboratorsがundefinedの場合', () => {

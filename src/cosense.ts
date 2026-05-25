@@ -2,6 +2,21 @@ import { fetch } from "@whatwg-node/fetch";
 import { sortPages } from './utils/sort.js';
 const API_DOMAIN = process.env.API_DOMAIN || "scrapbox.io";
 
+type CosenseUser = {
+  id: string;
+  name: string;
+  displayName: string;
+  photo: string;
+};
+
+type PageLine = {
+  id: string;
+  text: string;
+  userId: string;
+  created: number;
+  updated: number;
+};
+
 // /api/pages/:projectname/search/query の型定義
 type SearchQueryResponse = {
   projectName: string; // data取得先のproject名
@@ -22,24 +37,9 @@ type SearchQueryResponse = {
     lines: string[];
     created?: number;
     updated?: number;
-    user?: {
-      id: string;
-      name: string;
-      displayName: string;
-      photo: string;
-    };
-    lastUpdateUser?: {
-      id: string;
-      name: string;
-      displayName: string;
-      photo: string;
-    };
-    collaborators?: {
-      id: string;
-      name: string;
-      displayName: string;
-      photo: string;
-    }[];
+    user?: CosenseUser;
+    lastUpdateUser?: CosenseUser;
+    collaborators?: CosenseUser[];
   }[];
   debug?: {  // デバッグ情報を追加
     request_url?: string;
@@ -53,46 +53,52 @@ type SearchQueryResponse = {
 type GetPageResponse = {
   id: string;
   title: string;
-  lines: {
-    id: string;
-    text: string;
-    userId: string;
-    created: number;
-    updated: number;
-  }[];
+  lines: PageLine[];
   created: number;
   updated: number;
-  links: string[];
-  relatedPages: {
+  links?: string[] | undefined;
+  relatedPages?: {
     links1hop: {
       title: string;
       descriptions: string[];
     }[];
-  };
-  user: {              // 追加: 最新の編集者情報
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
-  };
-  lastUpdateUser?: {
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
   } | undefined;
-  collaborators: {
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
-  }[];
+  user?: CosenseUser | undefined;              // 追加: 最新の編集者情報
+  lastUpdateUser?: CosenseUser | undefined;
+  collaborators?: CosenseUser[] | undefined;
   persistent?: boolean | undefined;
   debug?: {
     error?: string;
     warning?: string;
   } | undefined;
 };
+
+type ReadablePage = {
+  title: string;
+  lines: PageLine[];
+  created: number;
+  updated: number;
+  user?: CosenseUser | undefined;
+  lastUpdateUser?: CosenseUser | undefined;
+  collaborators: CosenseUser[];
+  links: string[];
+};
+
+function isCosenseUser(value: unknown): value is CosenseUser {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function normalizeUser(value: unknown): CosenseUser | undefined {
+  return isCosenseUser(value) ? value : undefined;
+}
+
+function normalizeCollaborators(value: unknown): CosenseUser[] {
+  return Array.isArray(value) ? value.filter(isCosenseUser) : [];
+}
+
+function normalizeLinks(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((link): link is string => typeof link === 'string') : [];
+}
 
 async function getPage(
   projectName: string,
@@ -124,78 +130,71 @@ async function getPage(
     if (!Array.isArray(typedPage.lines)) {
       return {
         ...typedPage,
+        lines: [],
+        links: normalizeLinks(typedPage.links),
+        collaborators: normalizeCollaborators(typedPage.collaborators),
         debug: {
           error: 'Invalid page response format: lines is not an array'
         }
       };
     }
 
+    const normalizedPage: GetPageResponse = {
+      ...typedPage,
+      links: normalizeLinks(typedPage.links),
+      collaborators: normalizeCollaborators(typedPage.collaborators),
+    };
+    const normalizedUser = normalizeUser(typedPage.user);
+    const normalizedLastUpdateUser = normalizeUser(typedPage.lastUpdateUser);
+
+    if (normalizedUser) {
+      normalizedPage.user = normalizedUser;
+    } else {
+      delete normalizedPage.user;
+    }
+
+    if (normalizedLastUpdateUser) {
+      normalizedPage.lastUpdateUser = normalizedLastUpdateUser;
+    } else {
+      delete normalizedPage.lastUpdateUser;
+    }
+
     // userとlastUpdateUserの整合性チェック
-    if (!typedPage.user && typedPage.lastUpdateUser) {
+    if (!normalizedPage.user && normalizedPage.lastUpdateUser) {
       // lastUpdateUserが存在するがuserが存在しない場合
       return {
-        ...typedPage,
-        user: typedPage.lastUpdateUser,
+        ...normalizedPage,
+        user: normalizedPage.lastUpdateUser,
         debug: {
-          warning: `Using lastUpdateUser as fallback for user information on page: ${typedPage.title}`
+          warning: `Using lastUpdateUser as fallback for user information on page: ${normalizedPage.title}`
         }
       };
-    } else if (!typedPage.user) {
+    } else if (!normalizedPage.user) {
       // どちらの情報も存在しない場合
       return {
-        ...typedPage,
+        ...normalizedPage,
         debug: {
-          warning: `Missing both user and lastUpdateUser information for page: ${typedPage.title}`
+          warning: `Missing both user and lastUpdateUser information for page: ${normalizedPage.title}`
         }
       };
     }
 
-    return typedPage;
+    return normalizedPage;
   } catch (error) {
     return null;
   }
 }
 
-function toReadablePage(page: GetPageResponse): {
-  title: string;
-  lines: {
-    id: string;
-    text: string;
-    userId: string;
-    created: number;
-    updated: number;
-  }[];
-  created: number;
-  updated: number;
-  user: {
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
-  };
-  lastUpdateUser?: {
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
-  } | undefined;
-  collaborators: {
-    id: string;
-    name: string;
-    displayName: string;
-    photo: string;
-  }[];
-  links: string[];
-} {
+function toReadablePage(page: GetPageResponse): ReadablePage {
   return {
     title: page.title,
     lines: page.lines,
     created: page.created,
     updated: page.updated,
-    user: page.user,
-    lastUpdateUser: page.lastUpdateUser ?? undefined,
-    collaborators: page.collaborators ?? [],
-    links: page.links,
+    user: normalizeUser(page.user) ?? normalizeUser(page.lastUpdateUser),
+    lastUpdateUser: normalizeUser(page.lastUpdateUser),
+    collaborators: normalizeCollaborators(page.collaborators),
+    links: normalizeLinks(page.links),
   };
 }
 
